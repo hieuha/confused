@@ -1,9 +1,11 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -22,7 +24,21 @@ func NewPythonLookup(verbose bool) PackageResolver {
 //
 // Returns any errors encountered
 func (p *PythonLookup) ReadPackagesFromFile(filename string) error {
-	rawfile, err := ioutil.ReadFile(filename)
+	var (
+		rawfile []byte
+		err     error
+	)
+	_, err = url.ParseRequestURI(filename)
+	if err != nil {
+		rawfile, err = ioutil.ReadFile(filename)
+	} else {
+		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		resp, err := http.Get(filename)
+		if err != nil {
+			return err
+		}
+		rawfile, err = ioutil.ReadAll(resp.Body)
+	}
 	if err != nil {
 		return err
 	}
@@ -35,7 +51,7 @@ func (p *PythonLookup) ReadPackagesFromFile(filename string) error {
 		if len(l) > 0 {
 			// Support line continuation
 			if strings.HasSuffix(l, "\\") {
-				line += l[:len(l) - 1]
+				line += l[:len(l)-1]
 				continue
 			}
 			line += l

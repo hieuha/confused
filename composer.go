@@ -1,21 +1,23 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"time"
 )
 
 type ComposerJSON struct {
-	Require map[string]string `json:"require"`
+	Require    map[string]string `json:"require"`
 	RequireDev map[string]string `json:"require-dev"`
 }
 
 type ComposerLookup struct {
 	Packages []string
-	Verbose bool
+	Verbose  bool
 }
 
 func NewComposerLookup(verbose bool) PackageResolver {
@@ -23,7 +25,21 @@ func NewComposerLookup(verbose bool) PackageResolver {
 }
 
 func (c *ComposerLookup) ReadPackagesFromFile(filename string) error {
-	rawfile, err := ioutil.ReadFile(filename)
+	var (
+		rawfile []byte
+		err     error
+	)
+	_, err = url.ParseRequestURI(filename)
+	if err != nil {
+		rawfile, err = ioutil.ReadFile(filename)
+	} else {
+		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		resp, err := http.Get(filename)
+		if err != nil {
+			return err
+		}
+		rawfile, err = ioutil.ReadAll(resp.Body)
+	}
 	if err != nil {
 		return err
 	}

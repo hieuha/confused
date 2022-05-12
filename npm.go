@@ -1,10 +1,12 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -28,16 +30,16 @@ type NpmResponse struct {
 }
 
 type NpmResponseUnpublished struct {
-		Maintainers []struct {
-			Email string `json:"email"`
-			Name  string `json:"name"`
-		} `json:"maintainers"`
-		Name string `json:"name"`
-		Tags struct {
-			Latest string `json:"latest"`
-		} `json:"tags"`
-		Time     time.Time `json:"time"`
-		Versions []string  `json:"versions"`
+	Maintainers []struct {
+		Email string `json:"email"`
+		Name  string `json:"name"`
+	} `json:"maintainers"`
+	Name string `json:"name"`
+	Tags struct {
+		Latest string `json:"latest"`
+	} `json:"tags"`
+	Time     time.Time `json:"time"`
+	Versions []string  `json:"versions"`
 }
 
 // NotAvailable returns true if the package has its all versions unpublished making it susceptible for takeover
@@ -53,7 +55,7 @@ type NPMLookup struct {
 }
 
 type NPMPackage struct {
-	Name string
+	Name    string
 	Version string
 }
 
@@ -66,7 +68,21 @@ func NewNPMLookup(verbose bool) PackageResolver {
 //
 // Returns any errors encountered
 func (n *NPMLookup) ReadPackagesFromFile(filename string) error {
-	rawfile, err := ioutil.ReadFile(filename)
+	var (
+		rawfile []byte
+		err     error
+	)
+	_, err = url.ParseRequestURI(filename)
+	if err != nil {
+		rawfile, err = ioutil.ReadFile(filename)
+	} else {
+		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		resp, err := http.Get(filename)
+		if err != nil {
+			return err
+		}
+		rawfile, err = ioutil.ReadAll(resp.Body)
+	}
 	if err != nil {
 		return err
 	}

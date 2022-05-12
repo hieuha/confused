@@ -1,12 +1,14 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -18,9 +20,9 @@ type MVNLookup struct {
 }
 
 type MVNPackage struct {
-	Group string
+	Group    string
 	Artifact string
-	Version string
+	Version  string
 }
 
 // NewNPMLookup constructs an `MVNLookup` struct and returns it.
@@ -32,14 +34,28 @@ func NewMVNLookup(verbose bool) PackageResolver {
 //
 // Returns any errors encountered
 func (n *MVNLookup) ReadPackagesFromFile(filename string) error {
-	rawfile, err := ioutil.ReadFile(filename)
+	var (
+		rawfile []byte
+		err     error
+		project MavenProject
+	)
+	_, err = url.ParseRequestURI(filename)
+	if err != nil {
+		rawfile, err = ioutil.ReadFile(filename)
+	} else {
+		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		resp, err := http.Get(filename)
+		if err != nil {
+			return err
+		}
+		rawfile, err = ioutil.ReadAll(resp.Body)
+	}
 	if err != nil {
 		return err
 	}
 
 	fmt.Print("Checking: filename: " + filename + "\n")
 
-	var project MavenProject
 	if err := xml.Unmarshal([]byte(rawfile), &project); err != nil {
 		log.Fatalf("unable to unmarshal pom file. Reason: %s\n", err)
 	}
@@ -68,7 +84,7 @@ func (n *MVNLookup) PackagesNotInPublic() []string {
 	notavail := []string{}
 	for _, pkg := range n.Packages {
 		if !n.isAvailableInPublic(pkg, 0) {
-			notavail = append(notavail, pkg.Group + "/" + pkg.Artifact)
+			notavail = append(notavail, pkg.Group+"/"+pkg.Artifact)
 		}
 	}
 	return notavail
@@ -86,11 +102,11 @@ func (n *MVNLookup) isAvailableInPublic(pkg MVNPackage, retry int) bool {
 		return true
 	}
 
-	group := strings.Replace(pkg.Group, ".", "/",-1)
+	group := strings.Replace(pkg.Group, ".", "/", -1)
 	if n.Verbose {
-		fmt.Print("Checking: https://repo1.maven.org/maven2/"+group+"/ ")
+		fmt.Print("Checking: https://repo1.maven.org/maven2/" + group + "/ ")
 	}
-	resp, err := http.Get("https://repo1.maven.org/maven2/"+group+"/")
+	resp, err := http.Get("https://repo1.maven.org/maven2/" + group + "/")
 	if err != nil {
 		fmt.Printf(" [W] Error when trying to request https://repo1.maven.org/maven2/"+group+"/ : %s\n", err)
 		return false
