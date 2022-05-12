@@ -57,7 +57,7 @@ func main() {
 
 // Help outputs tool usage and help
 func Help() {
-	fmt.Printf("Usage:\n %s [-l LANGUAGENAME] depfilename.ext\n", os.Args[0])
+	fmt.Printf("Usage:\n %s [-l LANGUAGENAME] depfilename.ext || http://url/packages.json\n", os.Args[0])
 }
 
 // PrintResult outputs the result of the scanner
