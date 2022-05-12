@@ -42,7 +42,7 @@ trusted party has claimed the scope name in the public repositories.
 ## Usage
 ```
 Usage:
- ./confused [-l LANGUAGENAME] depfilename.ext
+ ./confused [-l LANGUAGENAME] depfilename.ext || http://url/packages.json
 
 Usage of ./confused:
   -l string
